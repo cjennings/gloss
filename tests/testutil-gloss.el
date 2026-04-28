@@ -76,5 +76,22 @@ any visiting buffer if BODY created them."
        (when (file-exists-p gloss-file)
          (delete-file gloss-file)))))
 
+(defconst gloss-test--testutil-dir
+  (file-name-directory (or load-file-name buffer-file-name default-directory))
+  "Directory of this testutil file; used to locate fixtures.")
+
+(defun gloss-test--load-wiktionary-fixture (name)
+  "Return the raw JSON body of fixture `wiktionary-NAME.json' as a string.
+NAME is the fixture name without the `wiktionary-' prefix or `.json'
+suffix (e.g. \"anaphora\").  Fixtures live in tests/fixtures/ alongside
+this file.  Signal `error' with the full path if the file is missing."
+  (let ((path (expand-file-name (format "fixtures/wiktionary-%s.json" name)
+                                gloss-test--testutil-dir)))
+    (unless (file-exists-p path)
+      (error "Wiktionary fixture not found: %s" path))
+    (with-temp-buffer
+      (insert-file-contents path)
+      (buffer-string))))
+
 (provide 'testutil-gloss)
 ;;; testutil-gloss.el ends here
