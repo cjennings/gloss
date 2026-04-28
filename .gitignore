@@ -1,0 +1,20 @@
+/todo.org
+/.ai/
+/inbox/
+
+# Personal Claude tooling state
+/.claude/settings.local.json
+/.claude/.cache/
+
+# Elisp build artefacts
+*.elc
+*.eln
+
+# Test logs
+/tests/*-output.log
+
+# OS / editor noise
+.DS_Store
+*~
+\#*\#
+.\#*

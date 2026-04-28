@@ -1,0 +1,20 @@
+#+TITLE: gloss — Glossary Lookup with Online-Sourced Selection
+#+OPTIONS: toc:nil
+
+A personal Emacs glossary. =C-h g= looks up terms in a single git-tracked org file. On a local miss, =gloss= fetches candidate definitions from Wiktionary and prompts you to pick which one to save — with provenance recorded. The same org file feeds =org-drill= for spaced-repetition study.
+
+* Status
+
+In active development. v1 not yet released. See [[file:docs/design/gloss.org][docs/design/gloss.org]] for the full design.
+
+* Why not just =quick-sdcv= or =dictionary=?
+
+Domain jargon — government acronyms, technical terms, philosophy vocabulary, project-specific names — doesn't live in any general dictionary, so =quick-sdcv= and =M-x dictionary= can't help. =gloss= grows by use: encounter a term, save it once, and it's permanently looked-up-able and study-card-able.
+
+* Quick start
+
+(This section will fill out as v1 lands. For now, see [[file:docs/design/gloss.org][docs/design/gloss.org]].)
+
+* License
+
+GPL-3.0-or-later. See [[file:LICENSE][LICENSE]].
