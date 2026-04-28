@@ -21,8 +21,8 @@
         (gloss-fetch-test--status-response "HTTP/1.1 429 Too Many Requests" ""))
     (let ((result (gloss-fetch-definitions "anaphora")))
       (should (eq (car result) :empty))
-      (should (member 'wiktionary (plist-get result :failed)))
-      (should-not (plist-get result :no-defs)))))
+      (should (member 'wiktionary (plist-get (cdr result) :failed)))
+      (should-not (plist-get (cdr result) :no-defs)))))
 
 (ert-deftest test-gloss-fetch-definitions-429-tracked-separately-internally ()
   "Boundary: per-source status taxonomy distinguishes :rate-limited from :server-error.

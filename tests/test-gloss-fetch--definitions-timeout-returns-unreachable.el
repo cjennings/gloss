@@ -20,8 +20,8 @@
       (lambda (_url) nil)
     (let ((result (gloss-fetch-definitions "anaphora")))
       (should (eq (car result) :empty))
-      (should (member 'wiktionary (plist-get result :failed)))
-      (should-not (plist-get result :no-defs)))))
+      (should (member 'wiktionary (plist-get (cdr result) :failed)))
+      (should-not (plist-get (cdr result) :no-defs)))))
 
 (ert-deftest test-gloss-fetch-definitions-timeout-marks-source-unreachable ()
   "Boundary: per-source status is :unreachable, distinct from :server-error."

@@ -17,7 +17,8 @@
 
 (ert-deftest test-gloss-fetch-libxml-absent-signals-user-error ()
   "Error: with libxml unavailable, the first fetch signals user-error and disables online."
-  (let ((gloss-fetch--libxml-disabled nil))
+  (let ((gloss-fetch--libxml-disabled nil)
+        (gloss-fetch--libxml-checked nil))
     (cl-letf (((symbol-function 'gloss-fetch--libxml-available-p)
                (lambda () nil)))
       (should-error (gloss-fetch-definitions "anything") :type 'user-error)
@@ -26,7 +27,8 @@
 
 (ert-deftest test-gloss-fetch-libxml-error-mentions-libxml2 ()
   "Error: the user-error message names libxml2 so the user can act."
-  (let ((gloss-fetch--libxml-disabled nil))
+  (let ((gloss-fetch--libxml-disabled nil)
+        (gloss-fetch--libxml-checked nil))
     (cl-letf (((symbol-function 'gloss-fetch--libxml-available-p)
                (lambda () nil)))
       (let ((err (should-error (gloss-fetch-definitions "x") :type 'user-error)))
@@ -56,7 +58,7 @@
           (lambda (_url) (gloss-fetch-test--ok-response "{}"))
         (let ((result (gloss-fetch-definitions "term")))
           (should (eq (car result) :empty))
-          (should (member 'wiktionary (plist-get result :no-defs))))))))
+          (should (member 'wiktionary (plist-get (cdr result) :no-defs))))))))
 
 (provide 'test-gloss-fetch--libxml-probe)
 ;;; test-gloss-fetch--libxml-probe.el ends here

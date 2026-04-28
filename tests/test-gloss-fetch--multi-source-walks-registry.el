@@ -43,8 +43,8 @@
          (gloss-fetch-sources '(alpha beta))
          (result (gloss-fetch-definitions "x")))
     (should (eq (car result) :empty))
-    (should (member 'alpha (plist-get result :no-defs)))
-    (should (member 'beta (plist-get result :failed)))))
+    (should (member 'alpha (plist-get (cdr result) :no-defs)))
+    (should (member 'beta (plist-get (cdr result) :failed)))))
 
 (ert-deftest test-gloss-fetch-rollup-any-ok-yields-ok ()
   "Boundary: if any source returns :ok with defs, the rollup is (:ok DEFS)."
