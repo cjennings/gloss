@@ -56,22 +56,9 @@
 (require 'gloss-display)
 (require 'gloss-drill)
 
-(defgroup gloss nil
-  "Personal glossary with online-sourced definitions."
-  :group 'tools
-  :prefix "gloss-")
-
-(defcustom gloss-file
-  (expand-file-name "gloss.org" (or (bound-and-true-p org-directory)
-                                    user-emacs-directory))
-  "Path to the glossary org file."
-  :type 'file
-  :group 'gloss)
-
-(defcustom gloss-debug nil
-  "When non-nil, write diagnostic events to *gloss-debug*."
-  :type 'boolean
-  :group 'gloss)
+;; The `gloss' defgroup, `gloss-file', and `gloss-debug' defcustoms live in
+;; `gloss-core' so they are defined whenever the data layer is required —
+;; tests load `gloss-core' directly without pulling in the orchestration here.
 
 (defvar gloss-prefix-map (make-sparse-keymap)
   "Keymap for `gloss' commands.  Default prefix: C-h g.")
