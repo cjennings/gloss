@@ -59,15 +59,9 @@
 
 (ert-deftest test-gloss-core-lookup-missing-file-returns-nil ()
   "Error: lookup before any save returns nil (file does not exist)."
-  (let ((gloss-file (concat temporary-file-directory "gloss-nonexistent-"
-                            (number-to-string (random 100000)) ".org")))
-    (unwind-protect
-        (progn
-          (gloss-core--cache-reset)
-          (should-not (file-exists-p gloss-file))
-          (should-not (gloss-core-lookup "anything")))
-      (gloss-core--cache-reset)
-      (when (file-exists-p gloss-file) (delete-file gloss-file)))))
+  (gloss-test--with-missing-glossary
+    (should-not (file-exists-p gloss-file))
+    (should-not (gloss-core-lookup "anything"))))
 
 (provide 'test-gloss-core--lookup)
 ;;; test-gloss-core--lookup.el ends here

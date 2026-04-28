@@ -36,14 +36,8 @@
 
 (ert-deftest test-gloss-core-find-buffer-position-missing-file-returns-nil ()
   "Error: returns nil when the file does not exist."
-  (let ((gloss-file (concat temporary-file-directory "gloss-pos-nonexistent-"
-                            (number-to-string (random 100000)) ".org")))
-    (unwind-protect
-        (progn
-          (gloss-core--cache-reset)
-          (should-not (gloss-core-find-buffer-position "any")))
-      (gloss-core--cache-reset)
-      (when (file-exists-p gloss-file) (delete-file gloss-file)))))
+  (gloss-test--with-missing-glossary
+    (should-not (gloss-core-find-buffer-position "any"))))
 
 (provide 'test-gloss-core--find-buffer-position)
 ;;; test-gloss-core--find-buffer-position.el ends here

@@ -23,14 +23,8 @@
 
 (ert-deftest test-gloss-core-list-missing-file-returns-nil ()
   "Error: list before any save returns nil (file does not exist)."
-  (let ((gloss-file (concat temporary-file-directory "gloss-list-nonexistent-"
-                            (number-to-string (random 100000)) ".org")))
-    (unwind-protect
-        (progn
-          (gloss-core--cache-reset)
-          (should-not (gloss-core-list)))
-      (gloss-core--cache-reset)
-      (when (file-exists-p gloss-file) (delete-file gloss-file)))))
+  (gloss-test--with-missing-glossary
+    (should-not (gloss-core-list))))
 
 (provide 'test-gloss-core--list)
 ;;; test-gloss-core--list.el ends here

@@ -58,5 +58,23 @@ visiting buffer."
        (when (file-exists-p gloss-file)
          (delete-file gloss-file)))))
 
+(defmacro gloss-test--with-missing-glossary (&rest body)
+  "Bind `gloss-file' to a path that does not yet exist; run BODY.
+Reset the in-memory cache before BODY and after.  Clean up the file and
+any visiting buffer if BODY created them."
+  (declare (indent 0) (debug t))
+  `(let ((gloss-file (concat temporary-file-directory "gloss-missing-"
+                              (number-to-string (random 100000)) ".org")))
+     (unwind-protect
+         (progn
+           (gloss-core--cache-reset)
+           ,@body)
+       (gloss-core--cache-reset)
+       (when-let ((buf (find-buffer-visiting gloss-file)))
+         (with-current-buffer buf (set-buffer-modified-p nil))
+         (kill-buffer buf))
+       (when (file-exists-p gloss-file)
+         (delete-file gloss-file)))))
+
 (provide 'testutil-gloss)
 ;;; testutil-gloss.el ends here

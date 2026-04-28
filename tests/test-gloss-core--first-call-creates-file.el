@@ -14,24 +14,15 @@
 
 (ert-deftest test-gloss-core-save-creates-file-when-missing ()
   "Normal: first save creates the file with a TITLE header."
-  (let ((gloss-file (concat temporary-file-directory "gloss-create-"
-                            (number-to-string (random 100000)) ".org")))
-    (unwind-protect
-        (progn
-          (gloss-core--cache-reset)
-          (should-not (file-exists-p gloss-file))
-          (gloss-core-save "anaphora" "Reference earlier." 'manual)
-          (should (file-exists-p gloss-file))
-          (let ((content (with-temp-buffer
-                           (insert-file-contents gloss-file)
-                           (buffer-string))))
-            (should (string-match-p "#\\+TITLE:" content))
-            (should (string-match-p "^\\* anaphora" content))))
-      (gloss-core--cache-reset)
-      (when-let ((buf (find-buffer-visiting gloss-file)))
-        (with-current-buffer buf (set-buffer-modified-p nil))
-        (kill-buffer buf))
-      (when (file-exists-p gloss-file) (delete-file gloss-file)))))
+  (gloss-test--with-missing-glossary
+    (should-not (file-exists-p gloss-file))
+    (gloss-core-save "anaphora" "Reference earlier." 'manual)
+    (should (file-exists-p gloss-file))
+    (let ((content (with-temp-buffer
+                     (insert-file-contents gloss-file)
+                     (buffer-string))))
+      (should (string-match-p "#\\+TITLE:" content))
+      (should (string-match-p "^\\* anaphora" content)))))
 
 (ert-deftest test-gloss-core-save-creates-parent-directory ()
   "Boundary: first save creates missing parent directory."
