@@ -1,0 +1,36 @@
+;;; test-gloss-core--list.el --- Tests for gloss-core-list -*- lexical-binding: t -*-
+
+;; SPDX-License-Identifier: GPL-3.0-or-later
+
+;;; Commentary:
+;; Tests for `gloss-core-list' covering Normal/Boundary/Error cases.
+
+;;; Code:
+
+(require 'ert)
+(require 'gloss-core)
+(require 'testutil-gloss)
+
+(ert-deftest test-gloss-core-list-returns-all-terms-alphabetically ()
+  "Normal: list returns all terms in case-insensitive alphabetical order."
+  (gloss-test--with-temp-glossary gloss-test--sample-content
+    (should (equal (gloss-core-list) '("anaphora" "SBIR")))))
+
+(ert-deftest test-gloss-core-list-empty-glossary-returns-nil ()
+  "Boundary: list against an empty file returns nil."
+  (gloss-test--with-temp-glossary "#+TITLE: Glossary\n"
+    (should-not (gloss-core-list))))
+
+(ert-deftest test-gloss-core-list-missing-file-returns-nil ()
+  "Error: list before any save returns nil (file does not exist)."
+  (let ((gloss-file (concat temporary-file-directory "gloss-list-nonexistent-"
+                            (number-to-string (random 100000)) ".org")))
+    (unwind-protect
+        (progn
+          (gloss-core--cache-reset)
+          (should-not (gloss-core-list)))
+      (gloss-core--cache-reset)
+      (when (file-exists-p gloss-file) (delete-file gloss-file)))))
+
+(provide 'test-gloss-core--list)
+;;; test-gloss-core--list.el ends here
