@@ -4,7 +4,7 @@
 
 ;;; Commentary:
 ;; Normal/Boundary cases: a 200 response with valid JSON returns
-;; (:ok DEFS) and each def is a plist with :source and :text.  Uses the
+;; non-empty :defs in the rollup, and each def is a plist with :source and :text.  Uses the
 ;; captured Wiktionary fixtures replayed through a mocked
 ;; `url-retrieve-synchronously'.
 
@@ -17,13 +17,13 @@
 (require 'testutil-gloss-fetch)
 
 (ert-deftest test-gloss-fetch-definitions-200-anaphora-returns-ok ()
-  "Normal: anaphora fixture (single English sense) returns (:ok DEFS)."
+  "Normal: anaphora fixture (single English sense) returns non-empty :defs."
   (let ((body (gloss-test--load-wiktionary-fixture "anaphora")))
     (gloss-fetch-test--with-mocked-url
         (lambda (_url) (gloss-fetch-test--ok-response body))
       (let* ((result (gloss-fetch-definitions "anaphora"))
-             (defs (plist-get result :ok)))
-        (should (eq (car result) :ok))
+             (defs (plist-get result :defs)))
+        (should (plist-get result :defs))
         (should (consp defs))
         (should (>= (length defs) 1))
         (let ((first (car defs)))
@@ -39,8 +39,8 @@
     (gloss-fetch-test--with-mocked-url
         (lambda (_url) (gloss-fetch-test--ok-response body))
       (let* ((result (gloss-fetch-definitions "SBIR"))
-             (defs (plist-get result :ok)))
-        (should (eq (car result) :ok))
+             (defs (plist-get result :defs)))
+        (should (plist-get result :defs))
         (should (>= (length defs) 1))
         (dolist (d defs)
           (should (eq (plist-get d :source) 'wiktionary))

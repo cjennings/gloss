@@ -183,21 +183,22 @@ After =gloss-drill-export-all=, the heading line gains a =:drill:= tag and the p
 
 *=:reason= strings* carry the technical detail (=timeout (5s)=, =HTTP 503=, =malformed JSON: ...=) and land in =*gloss-debug*=. They are never user-facing.
 
-*User-facing rollup.* =gloss-fetch-definitions= aggregates per-source results into:
+*User-facing rollup.* =gloss-fetch-definitions= returns a uniform plist with three keys, all always present:
 
 #+begin_src emacs-lisp
-(:ok DEFS)                                       ;; any source returned >=1 def
-(:empty :no-defs (...) :failed (...))            ;; everything else
+(:defs DEFS                       ;; possibly-empty list of definition plists
+ :no-defs (SYM ...)               ;; sources reached but returning no defs
+ :failed (SYM ...))               ;; sources that could not be reached
 #+end_src
 
-=:failed= unions =:unreachable=, =:server-error=, =:rate-limited=.
+=:failed= unions =:unreachable=, =:server-error=, =:rate-limited=. Consumers branch on whether =(plist-get result :defs)= is non-empty.
 
 | Result shape                              | Message                                                            |
 |-------------------------------------------+--------------------------------------------------------------------|
-| Every source =:no-defs=, none failed      | "No definition for X in Wiktionary."                               |
-| Every source failed, none =:no-defs=      | "Couldn't reach Wiktionary."                                       |
-| Mix of =:no-defs= and failures            | "No definition in Wiktionary; couldn't reach DictionaryAPI."       |
-| Any =:ok= with defs                       | Silent on others — picker shows what came back                     |
+| =:defs= empty, only =:no-defs= populated  | "No definition for X in Wiktionary."                               |
+| =:defs= empty, only =:failed= populated   | "Couldn't reach Wiktionary."                                       |
+| =:defs= empty, both populated             | "No definition in Wiktionary; couldn't reach DictionaryAPI."       |
+| =:defs= non-empty                         | Silent on others — picker shows what came back                     |
 
 When v2 starts surfacing =:rate-limited= regularly, the rollup wording will gain a third visible category. v1 with no-key Wiktionary doesn't need it.
 

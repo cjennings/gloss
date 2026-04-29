@@ -42,12 +42,12 @@
                        (list :source 'beta :status :server-error :reason "HTTP 503")))))
          (gloss-fetch-sources '(alpha beta))
          (result (gloss-fetch-definitions "x")))
-    (should (eq (car result) :empty))
-    (should (member 'alpha (plist-get (cdr result) :no-defs)))
-    (should (member 'beta (plist-get (cdr result) :failed)))))
+    (should-not (plist-get result :defs))
+    (should (member 'alpha (plist-get result :no-defs)))
+    (should (member 'beta (plist-get result :failed)))))
 
 (ert-deftest test-gloss-fetch-rollup-any-ok-yields-ok ()
-  "Boundary: if any source returns :ok with defs, the rollup is (:ok DEFS)."
+  "Boundary: if any source returns :ok with defs, the rollup has non-empty :defs."
   (let* ((gloss-fetch--sources
           `((alpha . ,(lambda (_term)
                         (list :source 'alpha :status :no-defs :reason "404")))
@@ -56,9 +56,9 @@
                              (list (list :source 'beta :text "got it")))))))
          (gloss-fetch-sources '(alpha beta))
          (result (gloss-fetch-definitions "x")))
-    (should (eq (car result) :ok))
-    (should (= 1 (length (plist-get result :ok))))
-    (should (equal "got it" (plist-get (car (plist-get result :ok)) :text)))))
+    (should (plist-get result :defs))
+    (should (= 1 (length (plist-get result :defs))))
+    (should (equal "got it" (plist-get (car (plist-get result :defs)) :text)))))
 
 (ert-deftest test-gloss-fetch-collect-skips-source-not-in-defcustom ()
   "Error: a source registered in `gloss-fetch--sources' but not in `gloss-fetch-sources' is skipped."

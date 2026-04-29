@@ -57,8 +57,8 @@
       (gloss-fetch-test--with-mocked-url
           (lambda (_url) (gloss-fetch-test--ok-response "{}"))
         (let ((result (gloss-fetch-definitions "term")))
-          (should (eq (car result) :empty))
-          (should (member 'wiktionary (plist-get (cdr result) :no-defs))))))))
+          (should-not (plist-get result :defs))
+          (should (member 'wiktionary (plist-get result :no-defs))))))))
 
 (provide 'test-gloss-fetch--libxml-probe)
 ;;; test-gloss-fetch--libxml-probe.el ends here

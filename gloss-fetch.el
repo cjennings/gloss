@@ -13,8 +13,8 @@
 ;;
 ;; Public API:
 ;;   `gloss-fetch-definitions' TERM
-;;     -> (:ok DEFS)                                ; any source returned >=1 def
-;;        | (:empty :no-defs (SYM ...) :failed (SYM ...))
+;;     -> (:defs DEFS :no-defs (SYM ...) :failed (SYM ...))
+;;        ; uniform plist; success = DEFS non-empty.
 ;;
 ;; Each definition is a plist:
 ;;   (:source SYM :text "Reference to ...")
@@ -254,32 +254,36 @@ in `gloss-fetch--sources' are silently skipped."
     (nreverse results)))
 
 (defun gloss-fetch--rollup (per-source)
-  "Roll up PER-SOURCE results into the user-facing response shape.
-Returns (:ok DEFS) when any source returned :ok with non-empty :defs.
-Otherwise returns (:empty :no-defs (...) :failed (...))."
-  (let (ok-defs no-defs failed)
+  "Roll up PER-SOURCE results into the user-facing response plist.
+Always returns (:defs DEFS :no-defs (SYM ...) :failed (SYM ...)) with
+all three keys present.  DEFS is a (possibly empty) list of definition
+plists.  :no-defs lists sources that were reached but returned no
+definitions.  :failed lists sources that could not be reached.
+Consumers branch on whether DEFS is non-empty."
+  (let (defs no-defs failed)
     (dolist (entry per-source)
       (let ((sym (plist-get entry :source))
             (status (plist-get entry :status)))
         (cond
          ((and (eq status :ok) (plist-get entry :defs))
-          (setq ok-defs (append ok-defs (plist-get entry :defs))))
+          (setq defs (append defs (plist-get entry :defs))))
          ((eq status :no-defs)
           (push sym no-defs))
          ((memq status '(:unreachable :server-error :rate-limited))
           (push sym failed)))))
-    (if ok-defs
-        (list :ok ok-defs)
-      (list :empty
-            :no-defs (nreverse no-defs)
-            :failed (nreverse failed)))))
+    (list :defs defs
+          :no-defs (nreverse no-defs)
+          :failed (nreverse failed))))
 
 (defun gloss-fetch-definitions (term)
   "Fetch candidate definitions for TERM from each source in `gloss-fetch-sources'.
-Returns (:ok DEFS) when any source returns at least one definition,
-otherwise (:empty :no-defs (SYM ...) :failed (SYM ...)).  Signals
-`user-error' the first time it runs in a session without libxml, and
-on every subsequent call in that session."
+Returns a plist with three keys, all always present:
+  :defs    — list of definition plists, possibly empty.
+  :no-defs — list of sources reached but returning no definitions.
+  :failed  — list of sources that could not be reached.
+Consumers branch on whether `(plist-get result :defs)' is non-empty.
+Signals `user-error' the first time it runs in a session without libxml,
+and on every subsequent call in that session."
   (gloss-fetch--ensure-libxml)
   (gloss-fetch--rollup (gloss-fetch--collect term)))
 

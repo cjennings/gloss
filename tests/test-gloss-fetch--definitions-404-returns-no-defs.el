@@ -15,24 +15,24 @@
 (require 'testutil-gloss-fetch)
 
 (ert-deftest test-gloss-fetch-definitions-404-rolls-up-to-empty-no-defs ()
-  "Normal: a 404 from the only source rolls up to (:empty :no-defs (wiktionary) :failed nil)."
+  "Normal: a 404 from the only source rolls up with :no-defs = (wiktionary), :failed and :defs = nil."
   (gloss-fetch-test--with-mocked-url
       (lambda (_url)
         (gloss-fetch-test--status-response "HTTP/1.1 404 Not Found"
                                            "{\"detail\":\"Page not found\"}"))
     (let ((result (gloss-fetch-definitions "asdf-not-a-word")))
-      (should (eq (car result) :empty))
-      (should (member 'wiktionary (plist-get (cdr result) :no-defs)))
-      (should-not (plist-get (cdr result) :failed)))))
+      (should-not (plist-get result :defs))
+      (should (member 'wiktionary (plist-get result :no-defs)))
+      (should-not (plist-get result :failed)))))
 
 (ert-deftest test-gloss-fetch-definitions-200-empty-rolls-up-to-empty-no-defs ()
   "Boundary: a 200 with an empty JSON object also maps to :no-defs."
   (gloss-fetch-test--with-mocked-url
       (lambda (_url) (gloss-fetch-test--ok-response "{}"))
     (let ((result (gloss-fetch-definitions "term")))
-      (should (eq (car result) :empty))
-      (should (member 'wiktionary (plist-get (cdr result) :no-defs)))
-      (should-not (plist-get (cdr result) :failed)))))
+      (should-not (plist-get result :defs))
+      (should (member 'wiktionary (plist-get result :no-defs)))
+      (should-not (plist-get result :failed)))))
 
 (ert-deftest test-gloss-fetch-definitions-200-no-english-rolls-up-to-no-defs ()
   "Boundary: a 200 response with only non-English keys maps to :no-defs."
@@ -41,8 +41,8 @@
     (gloss-fetch-test--with-mocked-url
         (lambda (_url) (gloss-fetch-test--ok-response body))
       (let ((result (gloss-fetch-definitions "term")))
-        (should (eq (car result) :empty))
-        (should (member 'wiktionary (plist-get (cdr result) :no-defs)))))))
+        (should-not (plist-get result :defs))
+        (should (member 'wiktionary (plist-get result :no-defs)))))))
 
 (provide 'test-gloss-fetch--definitions-404-returns-no-defs)
 ;;; test-gloss-fetch--definitions-404-returns-no-defs.el ends here
