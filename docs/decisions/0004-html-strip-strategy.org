@@ -1,0 +1,54 @@
+#+TITLE: ADR-4: HTML strip strategy
+#+DATE: 2026-04-30
+#+STATUS: Accepted
+
+* Context
+
+Wiktionary's REST API returns definition text with HTML markup —
+=<span>= wrappers, =<a>= anchors, transclusion markers, occasional
+inline =<i>= and =<b>=. The package needs plain text in the saved
+glossary entry. The strip strategy must be robust on real responses
+(not toy inputs) and shouldn't add a heavyweight dependency.
+
+* Decision
+
+Strip via =libxml-parse-html-region=. Take the parsed tree, recurse
+through it collecting text nodes, drop everything else. No
+preservation of inline formatting (italic, bold, links).
+
+If the running Emacs wasn't built with libxml2, online fetching is
+disabled package-wide for the session with a one-shot user-error.
+Manual =gloss-add= still works without libxml.
+
+* Consequences
+
+*Positive.*
+
+- Robust on edge cases — nested tags, malformed HTML, unusual
+  attributes. The libxml parser handles all of these.
+- libxml2 is standard on Linux and macOS; ships with most Emacs
+  builds. The "missing libxml" path is real but rare.
+- ~30 lines of strip code. Maintainable.
+
+*Negative.*
+
+- Loses italic/bold/link formatting from definitions. The saved
+  entry is plain text only. v1 trades fidelity for simplicity.
+- A user on a barebones Emacs build (no libxml2) loses online
+  fetching entirely. The error message tells them why and what to
+  do, but it's still a hit.
+
+* Alternatives Considered
+
+*Regex strip* — pattern-replace =<[^>]+>= and known HTML entities.
+Rejected: misses entities the regex didn't anticipate, breaks on
+attributes containing =>=, fights when tags are malformed. Looks
+simpler but rots fast.
+
+*Preserve markdown-style inline formatting* — italic → =/.../=, bold
+→ =*...*=. Rejected for v1: scope creep on a personal package.
+Defensible v1.1 if requested.
+
+*=shr-render-region=.* Rejected: shr is a renderer, not a stripper.
+It produces text-with-faces meant for display, not text for
+storage. Wrong shape for the use case.

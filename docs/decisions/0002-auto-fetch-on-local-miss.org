@@ -1,0 +1,51 @@
+#+TITLE: ADR-2: Auto-fetch on local miss
+#+DATE: 2026-04-30
+#+STATUS: Accepted
+
+* Context
+
+When the user runs =gloss-lookup= on a term that isn't in the local
+cache, the package can either prompt before going online or fall
+through silently. The trade-off is between explicit consent (no
+surprise network calls) and frictionless typical use.
+
+* Decision
+
+Silent fall-through. On a cache miss, =gloss-lookup= calls the online
+fetcher without asking. Network failures surface clearly via the
+error rollup (see ADR on the error taxonomy in the design doc).
+
+If a user wants a strict offline mode, they can wrap =gloss-lookup= or
+unbind =gloss-fetch-sources= to nil. v1 does not ship a defcustom toggle.
+
+* Consequences
+
+*Positive.*
+
+- The common case (term not in glossary, want a definition) takes
+  one keystroke (=C-h g g=) instead of two.
+- The user-facing message on a network failure is the same shape as
+  any other failure mode — there's no special "you would have hit
+  the network" affordance to explain.
+
+*Negative.*
+
+- A user on a metered connection or in a restricted environment
+  might prefer an explicit prompt. v1 doesn't accommodate that.
+- A typo on the term means a wasted network call. The cost is small
+  (one HTTP request to Wiktionary) and the failure is fast.
+
+* Alternatives Considered
+
+*y/n prompt before fetch.* Rejected: the answer would be "yes" 99%
+of the time, and the prompt becomes friction the user trains
+themselves to ignore. The 1% offline case is better handled by
+detecting the failure than by pre-asking permission.
+
+*Defcustom =gloss-auto-fetch=.* Rejected for v1: adds a knob with no
+clear default. If shakedown reveals a real need, adding the knob in
+v1.1 is straightforward — silent fall-through is the harder default
+to walk back.
+
+*Hard-fail offline.* Rejected: turns "not in glossary" into a fatal
+error, which is the wrong shape for what should be a soft fall-through.

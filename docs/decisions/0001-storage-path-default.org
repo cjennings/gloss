@@ -1,0 +1,55 @@
+#+TITLE: ADR-1: Storage path default
+#+DATE: 2026-04-30
+#+STATUS: Accepted
+
+* Context
+
+The glossary is a single org file. The package needs a default location
+that integrates with the user's existing org workflow when one exists,
+and falls back gracefully otherwise. The choice is visible to users via
+the =gloss-file= defcustom and to the file system as the path that gets
+auto-created on first save.
+
+* Decision
+
+Default =gloss-file= to:
+
+#+begin_src emacs-lisp
+(expand-file-name "gloss.org" (or org-directory user-emacs-directory))
+#+end_src
+
+If =org-directory= is set, the glossary lives next to the user's other
+org files. If it isn't, the glossary lives under =user-emacs-directory=
+(typically =~/.emacs.d/=).
+
+* Consequences
+
+*Positive.*
+
+- Users with an established =org-directory= get the glossary in their
+  org tree without configuration.
+- Users without =org-directory= still get a sensible default path that
+  doesn't require a directory tree to exist.
+- The path is writable on every supported platform without privilege.
+
+*Negative.*
+
+- =user-emacs-directory= isn't intended for user data — it's
+  configuration. Users who care will set =gloss-file= explicitly.
+- A user who later sets =org-directory= won't see the glossary move.
+  =gloss-file= is captured at defcustom evaluation time, not on each
+  call. This is documented in the README troubleshooting section.
+
+* Alternatives Considered
+
+*Hardcoded path* — e.g. =~/.gloss.org= or =~/gloss.org=. Rejected:
+ignores the org-directory convention; doesn't respect user
+preferences for where data lives.
+
+*XDG_DATA_HOME* — e.g. =~/.local/share/gloss/gloss.org=. Rejected:
+correct in spirit but adds a layer the user doesn't otherwise see in
+their org workflow. The whole point is "this is one of your org
+files."
+
+*Package-data dir* — e.g. inside the gloss package's install location.
+Rejected: data shouldn't live with code; survives reinstalls poorly.

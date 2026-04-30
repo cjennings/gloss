@@ -294,14 +294,14 @@ Per-source statuses from Error Handling land here verbatim. No personal data bey
 
 No metrics export, no telemetry, no profiling hooks — v3 territory if the package ever needs them.
 
-* Open Questions (will become ADRs)
+* Decisions Recorded
 
-Each was decided during the brainstorm. Listed for traceability; each becomes an ADR in the gloss repo's =docs/decisions/=.
+The four design decisions called out during the brainstorm are now ADRs under [[file:../decisions/][docs/decisions/]]:
 
-- [ ] *ADR-1: storage path default* → =(expand-file-name "gloss.org" (or org-directory user-emacs-directory))=. Rationale: respects the user's existing =org-directory= convention; falls back gracefully.
-- [ ] *ADR-2: auto-fetch on local miss* → silent fall-through with graceful network-failure path. Rationale: y/n prompt is yes 99% of the time and an annoyance the other 1%; the offline case is better handled by detecting the failure than by pre-asking permission.
-- [ ] *ADR-3: drill direction* → =:DRILL_CARD_TYPE: twosided=. Rationale: tests both recognition and recall over time without doubling the deck.
-- [ ] *ADR-4: HTML strip strategy* → =libxml-parse-html-region= (plain text only, no italic/bold preservation). Rationale: more robust than regex on edge cases; libxml2 is standard on Linux/Mac; ~30 lines.
+- [[file:../decisions/0001-storage-path-default.org][ADR-1: Storage path default]] → =(expand-file-name "gloss.org" (or org-directory user-emacs-directory))=.
+- [[file:../decisions/0002-auto-fetch-on-local-miss.org][ADR-2: Auto-fetch on local miss]] → silent fall-through with graceful network-failure path.
+- [[file:../decisions/0003-drill-direction.org][ADR-3: Drill direction]] → =:DRILL_CARD_TYPE: twosided=.
+- [[file:../decisions/0004-html-strip-strategy.org][ADR-4: HTML strip strategy]] → =libxml-parse-html-region= (plain text only, no italic/bold preservation).
 
 * Next Steps
 

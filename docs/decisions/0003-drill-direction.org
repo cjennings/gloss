@@ -1,0 +1,49 @@
+#+TITLE: ADR-3: Drill direction
+#+DATE: 2026-04-30
+#+STATUS: Accepted
+
+* Context
+
+=gloss-drill-export-all= tags every entry for =org-drill=. The card
+type controls which direction(s) the drill quizzes — term-to-definition
+(recognition), definition-to-term (recall), or both.
+
+* Decision
+
+Set =:DRILL_CARD_TYPE: twosided= on every exported entry.
+=org-drill='s twosided card type alternates direction on consecutive
+visits, so a single entry quizzes both directions over time.
+
+No per-entry override in v1. Every entry exports as twosided.
+
+* Consequences
+
+*Positive.*
+
+- Tests both recognition and recall over time without doubling the
+  deck size — one entry, both directions, alternated by =org-drill='s
+  scheduler.
+- No per-entry decision burden during =gloss-add= or
+  =gloss-drill-export=.
+
+*Negative.*
+
+- Some terms make more sense one-directional. A user who saved
+  "SBIR" → "Small Business Innovation Research" probably wants
+  recognition only (acronym → expansion), not recall (expansion →
+  acronym). v1 doesn't accommodate this.
+- A future v2 may want a per-entry =:DRILL_CARD_TYPE:= override or a
+  defcustom for the default. Both are additive changes.
+
+* Alternatives Considered
+
+*=:DRILL_CARD_TYPE: simple= (term → definition only).* Rejected:
+half the value of the cards, and the user can always skip-back
+during drill if they don't want the reverse direction.
+
+*Two cards per entry, one each direction.* Rejected: doubles the
+deck size; adds maintenance burden when an entry is edited (now
+two cards diverge).
+
+*Cloze cards.* Rejected: needs a marked deletion in the body, which
+fights the "save once, drill forever" promise.
