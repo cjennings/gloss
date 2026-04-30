@@ -122,19 +122,93 @@ Returns a symbol naming the action taken: :show, :auto-save, :pick,
   (interactive (list (read-string "Glossary lookup: " (thing-at-point 'word t))))
   (gloss--lookup-flow term))
 
+(defvar gloss-add-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-c") #'gloss-add-finish)
+    (define-key map (kbd "C-c C-k") #'gloss-add-abort)
+    map)
+  "Keymap for `gloss-add-mode'.")
+
+(define-derived-mode gloss-add-mode text-mode "GlossAdd"
+  "Major mode for entering a glossary entry's body.
+
+\\{gloss-add-mode-map}"
+  (setq header-line-format
+        (substitute-command-keys
+         "Type the body.  \\[gloss-add-finish] saves; \\[gloss-add-abort] cancels.")))
+
+(defvar-local gloss-add--term nil
+  "Term being added in this `gloss-add-mode' buffer.")
+
+(defun gloss--add-finish-internal (term body)
+  "Save TERM with BODY as a manual entry, then show it.
+Returns the saved entry plist, or nil if `gloss-core-save' returned nil
+(e.g. user cancelled at the collision prompt).  Trims surrounding
+whitespace from BODY before saving."
+  (when (string-empty-p (string-trim (or term "")))
+    (user-error "gloss-add: term cannot be empty"))
+  (let ((trimmed (string-trim (or body ""))))
+    (when (string-empty-p trimmed)
+      (user-error "gloss-add: body cannot be empty"))
+    (let ((saved (gloss-core-save term trimmed 'manual)))
+      (when saved
+        (gloss-display-show-entry term trimmed))
+      saved)))
+
+(defun gloss-add-finish ()
+  "Save the current `gloss-add-mode' buffer's body for the recorded term."
+  (interactive)
+  (unless gloss-add--term
+    (user-error "gloss-add: no term recorded for this buffer"))
+  (let ((term gloss-add--term)
+        (body (buffer-string))
+        (buf (current-buffer)))
+    (gloss--add-finish-internal term body)
+    (let ((kill-buffer-query-functions nil))
+      (kill-buffer buf))))
+
+(defun gloss-add-abort ()
+  "Abandon the current `gloss-add-mode' buffer without saving."
+  (interactive)
+  (let ((kill-buffer-query-functions nil))
+    (kill-buffer (current-buffer))))
+
 ;;;###autoload
 (defun gloss-add (term)
-  "Add TERM to the glossary manually."
+  "Add TERM to the glossary manually.
+Opens a side buffer for the body; \\[gloss-add-finish] saves,
+\\[gloss-add-abort] cancels."
   (interactive (list (read-string "Add term: ")))
-  (ignore term)
-  (user-error "gloss-add: not yet implemented"))
+  (when (string-empty-p (string-trim (or term "")))
+    (user-error "gloss-add: term cannot be empty"))
+  (let ((buf (get-buffer-create (format "*gloss-add: %s*" term))))
+    (with-current-buffer buf
+      (erase-buffer)
+      (gloss-add-mode)
+      (setq gloss-add--term term))
+    (pop-to-buffer buf)))
+
+(defun gloss--after-save-refresh-cache ()
+  "Buffer-local `after-save-hook' that clears the gloss cache."
+  (gloss-core--cache-reset))
 
 ;;;###autoload
 (defun gloss-edit (term)
-  "Open the source org file at TERM's heading."
-  (interactive (list (read-string "Edit term: ")))
-  (ignore term)
-  (user-error "gloss-edit: not yet implemented"))
+  "Open the source org file at TERM's heading.
+Installs a buffer-local `after-save-hook' that refreshes the gloss
+cache when the file is saved."
+  (interactive (list (read-string "Edit term: " (thing-at-point 'word t))))
+  (let ((marker (gloss-core-find-buffer-position term)))
+    (unless marker
+      (user-error "gloss: term not in glossary: %s" term))
+    (switch-to-buffer (marker-buffer marker))
+    (goto-char marker)
+    (when (derived-mode-p 'org-mode)
+      (if (fboundp 'org-fold-show-entry)
+          (org-fold-show-entry)
+        (with-no-warnings (org-show-entry))))
+    (add-hook 'after-save-hook #'gloss--after-save-refresh-cache nil t)
+    marker))
 
 ;;;###autoload
 (defun gloss-fetch-online (term)
@@ -146,25 +220,93 @@ Returns a symbol naming the action taken: :show, :auto-save, :pick,
 (defun gloss-drill-export ()
   "Tag every entry as :drill: for `org-drill'."
   (interactive)
-  (user-error "gloss-drill-export: not yet implemented"))
+  (gloss-drill-export-all))
 
 ;;;###autoload
 (defun gloss-list-terms ()
-  "Browse glossary terms via `completing-read'."
+  "Browse glossary terms via `completing-read' and show the chosen one."
   (interactive)
-  (user-error "gloss-list-terms: not yet implemented"))
+  (let ((terms (gloss-core-list)))
+    (unless terms
+      (user-error "gloss: glossary is empty"))
+    (let ((chosen (completing-read "Term: " terms nil t)))
+      (when chosen
+        (gloss--lookup-flow chosen)))))
+
+(defun gloss--count-drill-tagged ()
+  "Return the number of top-level entries in `gloss-file' tagged :drill:.
+Returns 0 if `gloss-file' does not exist."
+  (if (and gloss-file (file-exists-p gloss-file))
+      (with-current-buffer (find-file-noselect gloss-file)
+        (unless (verify-visited-file-modtime (current-buffer))
+          (revert-buffer t t t))
+        (unless (derived-mode-p 'org-mode)
+          (let ((org-mode-hook nil)) (org-mode)))
+        (let ((count 0))
+          (org-map-entries
+           (lambda ()
+             (when (and (= 1 (org-current-level))
+                        (member "drill" (org-get-tags nil t)))
+               (setq count (1+ count)))))
+          count))
+    0))
+
+(defun gloss--stats-text ()
+  "Return a multi-line string summarizing glossary state."
+  (gloss-core--cache-ensure-or-init)
+  (let* ((terms (gloss-core-list))
+         (total (length terms))
+         (by-source (make-hash-table :test 'equal))
+         (drill-count (gloss--count-drill-tagged))
+         (file-size (when (and gloss-file (file-exists-p gloss-file))
+                      (file-attribute-size (file-attributes gloss-file))))
+         (mtime gloss-core--cache-mtime))
+    (dolist (term terms)
+      (let* ((entry (gloss-core-lookup term))
+             (source (or (plist-get entry :source) 'unknown)))
+        (puthash source (1+ (or (gethash source by-source) 0)) by-source)))
+    (let (source-pairs)
+      (maphash (lambda (k v) (push (cons k v) source-pairs)) by-source)
+      (format "Glossary stats:
+  Total terms:     %d
+  By source:       %s
+  Drill-tagged:    %d
+  File size:       %s bytes
+  Cache mtime:     %s
+"
+              total
+              (if source-pairs
+                  (mapconcat (lambda (pair)
+                               (format "%s=%d" (car pair) (cdr pair)))
+                             source-pairs ", ")
+                "(none)")
+              drill-count
+              (or file-size 0)
+              (if mtime
+                  (format-time-string "%Y-%m-%d %H:%M:%S" mtime)
+                "never")))))
 
 ;;;###autoload
 (defun gloss-stats ()
-  "Summarize the glossary state."
+  "Show glossary statistics in a side buffer."
   (interactive)
-  (user-error "gloss-stats: not yet implemented"))
+  (let ((buf (get-buffer-create "*gloss-stats*")))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (gloss--stats-text)))
+      (special-mode)
+      (goto-char (point-min)))
+    (display-buffer buf)
+    buf))
 
 ;;;###autoload
 (defun gloss-reload ()
   "Force reload of the glossary cache from disk."
   (interactive)
-  (user-error "gloss-reload: not yet implemented"))
+  (gloss-core--cache-reset)
+  (gloss-core--cache-ensure)
+  (message "gloss: cache reloaded"))
 
 ;;;###autoload
 (defun gloss-toggle-debug ()

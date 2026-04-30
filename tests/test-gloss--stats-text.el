@@ -30,8 +30,8 @@
       (should (string-match-p "File size:" text))
       (should (string-match-p "Cache mtime:" text)))))
 
-(ert-deftest test-gloss-stats-text-missing-file-reports-zero-and-never ()
-  "Error: missing glossary file reports zero terms and \"never\" mtime."
+(ert-deftest test-gloss-stats-text-missing-file-reports-zero ()
+  "Boundary: stats-text against a missing file creates it, reports zero terms."
   (gloss-test--with-missing-glossary
     (let ((text (gloss--stats-text)))
       (should (string-match-p "Total terms: +0" text)))))
