@@ -12,6 +12,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'cl-lib)
 (require 'gloss-display)
 
 (defmacro gloss-test--with-display-buffer-mocked (&rest body)
