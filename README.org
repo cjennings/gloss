@@ -9,13 +9,6 @@ A personal Emacs glossary. =C-h g= looks up terms in a single git-tracked org fi
 
 In active development. v1 not yet released. Core features land; first-week shakedown pending. See [[file:docs/design/gloss.org][docs/design/gloss.org]] for the full design and [[file:docs/decisions/][docs/decisions/]] for the recorded ADRs.
 
-* Why not =quick-sdcv= or =M-x dictionary=?
-:PROPERTIES:
-:CUSTOM_ID: why
-:END:
-
-Domain jargon — government acronyms, technical terms, philosophy vocabulary, project-specific names — doesn't live in any general dictionary, so =quick-sdcv= and =M-x dictionary= can't help. =gloss= grows by use: encounter a term, save it once, and it's permanently looked-up-able and study-card-able.
-
 * Features
 :PROPERTIES:
 :CUSTOM_ID: features
@@ -36,7 +29,7 @@ Domain jargon — government acronyms, technical terms, philosophy vocabulary, p
 :CUSTOM_ID: installation
 :END:
 
-Not on MELPA. =gloss= is on GitHub at [[https://github.com/cjennings/gloss]] and on cjennings.net at the bare repo behind the GitHub mirror.
+Not on MELPA. =gloss= is on GitHub at [[https://github.com/cjennings/gloss]].
 
 *Requirements:* Emacs 27.1+, org-mode 9.3+. Online fetching also requires an Emacs built with libxml2 (most distribution builds ship it).
 
