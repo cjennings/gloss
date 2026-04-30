@@ -63,12 +63,64 @@
 (defvar gloss-prefix-map (make-sparse-keymap)
   "Keymap for `gloss' commands.  Default prefix: C-h g.")
 
+(defun gloss--orchestrate-fetch-result (result)
+  "Return decision symbol for RESULT plist from `gloss-fetch-definitions'.
+Decision values:
+  :auto-save      — exactly one definition.
+  :pick           — two or more definitions.
+  :error-no-defs  — no defs and only :no-defs sources (or all empty).
+  :error-failed   — no defs and only :failed sources.
+  :error-mixed    — no defs but BOTH :no-defs and :failed populated."
+  (let ((defs (plist-get result :defs))
+        (no-defs (plist-get result :no-defs))
+        (failed (plist-get result :failed)))
+    (cond
+     ((= (length defs) 1) :auto-save)
+     ((> (length defs) 1) :pick)
+     ((and no-defs failed) :error-mixed)
+     (failed :error-failed)
+     (t :error-no-defs))))
+
+(defun gloss--lookup-flow (term &optional force-fetch)
+  "Look up TERM in the glossary.  Fetch online on miss.
+If FORCE-FETCH is non-nil, bypass the cache and fetch unconditionally.
+Returns a symbol naming the action taken: :show, :auto-save, :pick,
+:error-no-defs, :error-failed, or :error-mixed."
+  (let ((cached (and (not force-fetch) (gloss-core-lookup term))))
+    (if cached
+        (progn
+          (gloss-display-show-entry term (plist-get cached :body))
+          :show)
+      (let* ((result (gloss-fetch-definitions term))
+             (action (gloss--orchestrate-fetch-result result)))
+        (pcase action
+          (:auto-save
+           (let* ((def (car (plist-get result :defs)))
+                  (text (plist-get def :text))
+                  (source (plist-get def :source)))
+             (gloss-core-save term text source 'replace)
+             (gloss-display-show-entry term text)))
+          (:pick
+           (when-let* ((chosen (gloss-display-pick-definition
+                                term (plist-get result :defs)))
+                       (text (plist-get chosen :text))
+                       (source (plist-get chosen :source)))
+             (gloss-core-save term text source 'replace)
+             (gloss-display-show-entry term text)))
+          (:error-no-defs
+           (message "gloss: no definition found for %s" term))
+          (:error-failed
+           (message "gloss: couldn't reach any source for %s" term))
+          (:error-mixed
+           (message "gloss: no definition in some sources, others unreachable for %s"
+                    term)))
+        action))))
+
 ;;;###autoload
 (defun gloss-lookup (term)
   "Look up TERM in the glossary; fetch online on miss."
   (interactive (list (read-string "Glossary lookup: " (thing-at-point 'word t))))
-  (ignore term)
-  (user-error "gloss-lookup: not yet implemented"))
+  (gloss--lookup-flow term))
 
 ;;;###autoload
 (defun gloss-add (term)
@@ -87,9 +139,8 @@
 ;;;###autoload
 (defun gloss-fetch-online (term)
   "Force online fetch for TERM, bypassing the cache."
-  (interactive (list (read-string "Fetch online: ")))
-  (ignore term)
-  (user-error "gloss-fetch-online: not yet implemented"))
+  (interactive (list (read-string "Fetch online: " (thing-at-point 'word t))))
+  (gloss--lookup-flow term t))
 
 ;;;###autoload
 (defun gloss-drill-export ()
