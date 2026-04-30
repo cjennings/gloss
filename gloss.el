@@ -140,8 +140,13 @@ Returns a symbol naming the action taken: :show, :auto-save, :pick,
 (defvar-local gloss-add--term nil
   "Term being added in this `gloss-add-mode' buffer.")
 
+(defvar-local gloss-add--body-start nil
+  "Marker pointing at the first editable position in `gloss-add-mode'.
+Everything before this marker (the rendered header — term + underline
++ blank line) is text-property read-only.")
+
 (defun gloss--add-finish-internal (term body)
-  "Save TERM with BODY as a manual entry, then show it.
+  "Validate and save TERM with BODY as a manual entry.
 Returns the saved entry plist, or nil if `gloss-core-save' returned nil
 (e.g. user cancelled at the collision prompt).  Trims surrounding
 whitespace from BODY before saving."
@@ -150,43 +155,69 @@ whitespace from BODY before saving."
   (let ((trimmed (string-trim (or body ""))))
     (when (string-empty-p trimmed)
       (user-error "gloss-add: body cannot be empty"))
-    (let ((saved (gloss-core-save term trimmed 'manual)))
-      (when saved
-        (gloss-display-show-entry term trimmed))
-      saved)))
+    (gloss-core-save term trimmed 'manual)))
+
+(defun gloss--add-cleanup (buf win)
+  "Kill BUF and close WIN if it's still live.
+Used by both `gloss-add-finish' and `gloss-add-abort' so the layout
+returns to its pre-add state."
+  (let ((kill-buffer-query-functions nil))
+    (kill-buffer buf))
+  (when (window-live-p win)
+    (delete-window win)))
 
 (defun gloss-add-finish ()
-  "Save the current `gloss-add-mode' buffer's body for the recorded term."
+  "Save the current `gloss-add-mode' buffer's body for the recorded term.
+Body is everything after the read-only header.  After saving, kills the
+add buffer and closes the side window — the user is returned to the
+pre-add window layout, with a confirmation message in the echo area."
   (interactive)
   (unless gloss-add--term
     (user-error "gloss-add: no term recorded for this buffer"))
-  (let ((term gloss-add--term)
-        (body (buffer-string))
-        (buf (current-buffer)))
-    (gloss--add-finish-internal term body)
-    (let ((kill-buffer-query-functions nil))
-      (kill-buffer buf))))
+  (let* ((term gloss-add--term)
+         (body (buffer-substring-no-properties
+                (or gloss-add--body-start (point-min))
+                (point-max)))
+         (buf (current-buffer))
+         (win (get-buffer-window (current-buffer)))
+         (saved (gloss--add-finish-internal term body)))
+    (gloss--add-cleanup buf win)
+    (when saved
+      (message "gloss-add: saved %s" term))))
 
 (defun gloss-add-abort ()
-  "Abandon the current `gloss-add-mode' buffer without saving."
+  "Abandon the current `gloss-add-mode' buffer without saving.
+Kills the add buffer and closes the side window."
   (interactive)
-  (let ((kill-buffer-query-functions nil))
-    (kill-buffer (current-buffer))))
+  (gloss--add-cleanup (current-buffer)
+                      (get-buffer-window (current-buffer))))
 
 ;;;###autoload
 (defun gloss-add (term)
   "Add TERM to the glossary manually.
-Opens a side buffer for the body; \\[gloss-add-finish] saves,
-\\[gloss-add-abort] cancels."
+Opens a side-window buffer with TERM rendered as a read-only header
+and an editable body region beneath it.  \\[gloss-add-finish] saves
+and shows the saved entry; \\[gloss-add-abort] cancels and closes
+the side window."
   (interactive (list (read-string "Add term: ")))
   (when (string-empty-p (string-trim (or term "")))
     (user-error "gloss-add: term cannot be empty"))
   (let ((buf (get-buffer-create (format "*gloss-add: %s*" term))))
     (with-current-buffer buf
-      (erase-buffer)
-      (gloss-add-mode)
-      (setq gloss-add--term term))
-    (pop-to-buffer buf)))
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert (gloss-display--render-entry term ""))
+        (let ((body-start (point-max-marker)))
+          (set-marker-insertion-type body-start nil)
+          (add-text-properties (point-min) body-start
+                               '(read-only "Header is not editable"
+                                 front-sticky t
+                                 rear-nonsticky t))
+          (gloss-add-mode)
+          (setq gloss-add--term term)
+          (setq gloss-add--body-start body-start)))
+      (goto-char (point-max)))
+    (pop-to-buffer buf gloss-display--side-window-alist)))
 
 (defun gloss--after-save-refresh-cache ()
   "Buffer-local `after-save-hook' that clears the gloss cache."
