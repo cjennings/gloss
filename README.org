@@ -29,7 +29,7 @@ In active development. v1 not yet released. Core features land; first-week shake
 :CUSTOM_ID: installation
 :END:
 
-Not on MELPA. =gloss= is on GitHub at [[https://github.com/cjennings/gloss]].
+Not on MELPA. =gloss= is on GitHub at [[https://github.com/cjennings/gloss]] and on cjennings.net.
 
 *Requirements:* Emacs 27.1+, org-mode 9.3+. Online fetching also requires an Emacs built with libxml2 (most distribution builds ship it).
 
