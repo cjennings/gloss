@@ -21,15 +21,13 @@
 Reads the file fresh from disk."
   (with-current-buffer (find-file-noselect gloss-file)
     (revert-buffer t t t)
-    (let ((count 0))
+    (catch 'done
       (org-map-entries
        (lambda ()
          (when (= 1 (org-current-level))
-           (setq count (length (cl-remove-if-not
-                                (lambda (tag) (equal tag "drill"))
-                                (org-get-tags nil t))))
-           (throw 'done nil))))
-      count)))
+           (throw 'done
+                  (length (seq-filter (lambda (tag) (equal tag "drill"))
+                                      (org-get-tags nil t))))))))))
 
 (ert-deftest test-gloss-drill-export-all-idempotent-tag-not-duplicated ()
   "Boundary: running export-all twice does not duplicate the :drill: tag."
@@ -37,8 +35,7 @@ Reads the file fresh from disk."
     (gloss-test--with-org-drill-feature
       (gloss-drill-export-all)
       (gloss-drill-export-all)
-      (catch 'done
-        (should (= (gloss-test--drill-tag-count-on-first-entry) 1))))))
+      (should (= (gloss-test--drill-tag-count-on-first-entry) 1)))))
 
 (ert-deftest test-gloss-drill-export-all-idempotent-property-unchanged ()
   "Boundary: running export-all twice keeps :DRILL_CARD_TYPE: twosided."
