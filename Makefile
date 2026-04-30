@@ -10,11 +10,12 @@ TEST_FILES = $(wildcard tests/test-*.el)
 UNIT_TESTS = $(filter-out tests/test-integration-%.el,$(TEST_FILES))
 INTEGRATION_TESTS = $(wildcard tests/test-integration-*.el)
 
-.PHONY: help test test-unit test-integration test-file test-name validate-parens compile lint clean
+.PHONY: help test test-unit test-integration test-file test-name validate-parens compile lint clean install
 
 help:
 	@echo "Targets:"
-	@echo "  make test                     Run all tests"
+	@echo "  make install                  Install dev deps via Cask"
+	@echo "  make test                     Run all tests via cask exec ert-runner"
 	@echo "  make test-unit                Unit tests only"
 	@echo "  make test-integration         Integration tests only"
 	@echo "  make test-file FILE=path/to/test-foo.el   Run one test file"
@@ -24,22 +25,26 @@ help:
 	@echo "  make lint                     elisp-lint pass"
 	@echo "  make clean                    Remove .elc"
 
+install:
+	@cask install
+
 test:
-	@$(EMACS) $(EMACSFLAGS) $(LOADPATH) -l ert $(addprefix -l ,$(TEST_FILES)) -f ert-run-tests-batch-and-exit
+	@cask exec ert-runner $(TEST_FILES)
 
 test-unit:
-	@$(EMACS) $(EMACSFLAGS) $(LOADPATH) -l ert $(addprefix -l ,$(UNIT_TESTS)) -f ert-run-tests-batch-and-exit
+	@cask exec ert-runner $(UNIT_TESTS)
 
 test-integration:
-	@$(EMACS) $(EMACSFLAGS) $(LOADPATH) -l ert $(addprefix -l ,$(INTEGRATION_TESTS)) -f ert-run-tests-batch-and-exit
+	@if [ -z "$(INTEGRATION_TESTS)" ]; then echo "No integration tests yet."; exit 0; fi
+	@cask exec ert-runner $(INTEGRATION_TESTS)
 
 test-file:
 	@if [ -z "$(FILE)" ]; then echo "Usage: make test-file FILE=tests/test-NAME.el"; exit 1; fi
-	@$(EMACS) $(EMACSFLAGS) $(LOADPATH) -l ert -l "$(FILE)" -f ert-run-tests-batch-and-exit
+	@cask exec ert-runner "$(FILE)"
 
 test-name:
 	@if [ -z "$(TEST)" ]; then echo "Usage: make test-name TEST=pattern"; exit 1; fi
-	@$(EMACS) $(EMACSFLAGS) $(LOADPATH) -l ert $(addprefix -l ,$(TEST_FILES)) --eval "(ert-run-tests-batch-and-exit \"$(TEST)\")"
+	@cask exec ert-runner --pattern "$(TEST)" $(TEST_FILES)
 
 validate-parens:
 	@for f in $(PACKAGE_FILES) $(TEST_FILES); do \

@@ -10,6 +10,9 @@
 *.elc
 *.eln
 
+# Cask-installed deps
+/.cask/
+
 # Test logs
 /tests/*-output.log
 
