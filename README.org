@@ -1,19 +1,332 @@
 #+TITLE: gloss — Glossary Lookup with Online-Sourced Selection
 #+OPTIONS: toc:nil
 
+[[#features][Features]] | [[#installation][Installation]] | [[#quick-start][Quick Start]] | [[#keybindings][Keybindings]] | [[#configuration][Configuration]] | [[#extending-sources][Extending Sources]] | [[#org-drill][org-drill]] | [[#troubleshooting][Troubleshooting]] | [[#development][Development]]
+
 A personal Emacs glossary. =C-h g= looks up terms in a single git-tracked org file. On a local miss, =gloss= fetches candidate definitions from Wiktionary and prompts you to pick which one to save — with provenance recorded. The same org file feeds =org-drill= for spaced-repetition study.
 
 * Status
 
-In active development. v1 not yet released. See [[file:docs/design/gloss.org][docs/design/gloss.org]] for the full design.
+In active development. v1 not yet released. Core features land; first-week shakedown pending. See [[file:docs/design/gloss.org][docs/design/gloss.org]] for the full design and [[file:docs/decisions/][docs/decisions/]] for the recorded ADRs.
 
-* Why not just =quick-sdcv= or =dictionary=?
+* Why not =quick-sdcv= or =M-x dictionary=?
+:PROPERTIES:
+:CUSTOM_ID: why
+:END:
 
 Domain jargon — government acronyms, technical terms, philosophy vocabulary, project-specific names — doesn't live in any general dictionary, so =quick-sdcv= and =M-x dictionary= can't help. =gloss= grows by use: encounter a term, save it once, and it's permanently looked-up-able and study-card-able.
 
-* Quick start
+* Features
+:PROPERTIES:
+:CUSTOM_ID: features
+:END:
 
-(This section will fill out as v1 lands. For now, see [[file:docs/design/gloss.org][docs/design/gloss.org]].)
+- *Single-file storage.* One git-tracked org file, one =* term= heading per entry, alphabetical order maintained on insert. Diff-clean, hand-editable.
+- *Online fallback on cache miss.* Looks up missing terms in Wiktionary, presents candidate definitions in a side-buffer picker, saves the one you chose with provenance.
+- *Auto-save when there's only one definition.* No picker shown; the single definition lands in the glossary and the entry is displayed.
+- *Manual add* via a side-window editor with a read-only header (term + underline) and an editable body region. =C-c C-c= saves; =C-c C-k= cancels.
+- *Edit-in-place.* =C-h g e= jumps to the source org file at the entry's heading. A buffer-local =after-save-hook= refreshes the cache when you save.
+- *org-drill export.* Tag every entry as =:drill:= with =:DRILL_CARD_TYPE: twosided= via =C-h g D=. =M-x org-drill= runs the session unmodified.
+- *Layered architecture.* =gloss-core= (data) + =gloss-fetch= (network) + =gloss-display= (UI) + =gloss-drill= (drill export) + =gloss= (orchestration). Each layer mocks at its own boundary.
+- *Pluggable sources for v2+.* The =gloss-fetch--sources= alist registry walks fetchers in =gloss-fetch-sources= order; v1 ships only Wiktionary. Adding DictionaryAPI.dev or Wordnik later is one alist entry plus one fetcher function.
+- *Diagnostic =*gloss-debug*=* opt-in log buffer for layer-prefixed event tracing without polluting =*Messages*=.
+
+* Installation
+:PROPERTIES:
+:CUSTOM_ID: installation
+:END:
+
+Not on MELPA. =gloss= is on GitHub at [[https://github.com/cjennings/gloss]] and on cjennings.net at the bare repo behind the GitHub mirror.
+
+*Requirements:* Emacs 27.1+, org-mode 9.3+. Online fetching also requires an Emacs built with libxml2 (most distribution builds ship it).
+
+** package-vc-install (Emacs 29+)
+
+#+begin_src emacs-lisp
+(unless (package-installed-p 'gloss)
+  (package-vc-install "https://github.com/cjennings/gloss"))
+(require 'gloss)
+(gloss-install-prefix)            ; binds the C-h g sub-map
+#+end_src
+
+** use-package with =:vc= (Emacs 29+)
+
+#+begin_src emacs-lisp
+(use-package gloss
+  :vc (:url "https://github.com/cjennings/gloss" :rev :newest)
+  :commands (gloss-lookup gloss-add gloss-edit
+             gloss-fetch-online gloss-list-terms gloss-stats
+             gloss-reload gloss-drill-export gloss-toggle-debug)
+  :init
+  (gloss-install-prefix))
+#+end_src
+
+** straight.el
+
+#+begin_src emacs-lisp
+(straight-use-package
+ '(gloss :type git :host github :repo "cjennings/gloss"))
+(require 'gloss)
+(gloss-install-prefix)
+#+end_src
+
+** Manual installation
+
+#+begin_src bash
+git clone https://github.com/cjennings/gloss.git ~/path/to/gloss
+#+end_src
+
+Then in your init:
+
+#+begin_src emacs-lisp
+(add-to-list 'load-path "~/path/to/gloss")
+(require 'gloss)
+(gloss-install-prefix)
+#+end_src
+
+* Quick Start
+:PROPERTIES:
+:CUSTOM_ID: quick-start
+:END:
+
+After installing and running =(gloss-install-prefix)=, =C-h g= becomes the gloss prefix. The single most common command is =C-h g g= (lookup):
+
+1. *Type the term* you want to look up. =gloss-lookup= reads from the minibuffer with =word-at-point= as the default, so just =RET= grabs the word under point.
+2. *Cache hit:* a side window opens on the right showing the term and its body.
+3. *Cache miss with one definition online:* the package fetches Wiktionary, saves the definition silently with =:source: wiktionary=, and shows it.
+4. *Cache miss with multiple definitions:* a picker appears in the minibuffer with each option formatted as ~[wiktionary] ...~. Pick one — that's what gets saved.
+5. *Cache miss with no definitions:* the echo area shows ~gloss: no definition found for X~. No save.
+6. *Network failure:* the echo area shows ~gloss: couldn't reach any source for X~. No save. Try again later.
+
+To add a term manually (no online fetch), =C-h g a=:
+
+1. Minibuffer prompts =Add term:=. Type the term, =RET=.
+2. A side-window buffer opens with the term and a =====~ underline as a read-only header. Point lands in the editable body region underneath.
+3. Type the definition.
+4. =C-c C-c= saves the entry with =:source: manual= and closes the side window.
+5. =C-c C-k= cancels — no save, side window closes.
+
+* Keybindings
+:PROPERTIES:
+:CUSTOM_ID: keybindings
+:END:
+
+After =(gloss-install-prefix)=, all commands live under =C-h g=:
+
+| Key       | Command              | What it does                                              |
+|-----------+----------------------+-----------------------------------------------------------|
+| =C-h g g= | =gloss-lookup=       | Look up a term; fetch online on miss.                     |
+| =C-h g a= | =gloss-add=          | Add a term manually (read-only header + editable body).   |
+| =C-h g e= | =gloss-edit=         | Jump to the source org file at the term's heading.        |
+| =C-h g o= | =gloss-fetch-online= | Force online fetch, bypassing cache.                      |
+| =C-h g D= | =gloss-drill-export= | Tag every entry for =org-drill=.                          |
+| =C-h g l= | =gloss-list-terms=   | Browse glossary terms via =completing-read=.              |
+| =C-h g s= | =gloss-stats=        | Show total / by-source / drill-tagged / size / mtime.     |
+| =C-h g r= | =gloss-reload=       | Force reload of the cache from disk.                      |
+| =C-h g d= | =gloss-toggle-debug= | Toggle the =*gloss-debug*= log buffer.                    |
+
+You can change the prefix by passing an argument to =gloss-install-prefix=:
+
+#+begin_src emacs-lisp
+(gloss-install-prefix (kbd "C-c g"))
+#+end_src
+
+Or skip the helper entirely and bind =gloss-prefix-map= where you want.
+
+In =gloss-add-mode= (the =*gloss-add: TERM*= buffer):
+
+| Key       | Command            | What it does                          |
+|-----------+--------------------+---------------------------------------|
+| =C-c C-c= | =gloss-add-finish= | Save the body and close the buffer.   |
+| =C-c C-k= | =gloss-add-abort=  | Cancel; close without saving.         |
+
+In =gloss-mode= (the =*gloss: TERM*= side buffer): inherits =special-mode=, so =q= dismisses the window.
+
+* Configuration
+:PROPERTIES:
+:CUSTOM_ID: configuration
+:END:
+
+Four defcustoms. All of them have sensible defaults; configure only if you want different behaviour.
+
+** =gloss-file=
+
+The org file that holds the glossary. Default:
+
+#+begin_src emacs-lisp
+(expand-file-name "gloss.org"
+                  (or org-directory user-emacs-directory))
+#+end_src
+
+If your =org-directory= is set, the glossary lives next to your other org files. Otherwise it lands under =user-emacs-directory=. To override:
+
+#+begin_src emacs-lisp
+(setq gloss-file "~/notes/glossary.org")
+#+end_src
+
+The file is created on first save with a =#+TITLE: Glossary= header. Parent directory is created if missing. See [[file:docs/decisions/0001-storage-path-default.org][ADR-1]] for the rationale.
+
+** =gloss-fetch-sources=
+
+The list of online sources to try, in order. Default:
+
+#+begin_src emacs-lisp
+(setq gloss-fetch-sources '(wiktionary))
+#+end_src
+
+v1 ships with only =wiktionary=. Set to nil to disable all online fetching:
+
+#+begin_src emacs-lisp
+(setq gloss-fetch-sources nil)
+#+end_src
+
+When more sources land in v2+, you'll be able to reorder them or pick a subset. See [[#extending-sources][Extending Sources]] below.
+
+** =gloss-fetch-timeout=
+
+Maximum time in seconds to wait for any single source to respond. Default 5. Bump higher on slow connections, lower if you'd rather fail fast.
+
+#+begin_src emacs-lisp
+(setq gloss-fetch-timeout 10)
+#+end_src
+
+** =gloss-debug=
+
+When non-nil, =gloss= writes layer-prefixed diagnostic events to a =*gloss-debug*= buffer. Off by default. Toggle interactively with =C-h g d= or set:
+
+#+begin_src emacs-lisp
+(setq gloss-debug t)
+#+end_src
+
+The debug buffer is opt-in for everything beyond user-facing events; =*Messages*= still shows the things you actually did or asked for.
+
+* Extending Sources
+:PROPERTIES:
+:CUSTOM_ID: extending-sources
+:END:
+
+For v2+, register an additional fetcher in the source registry. The shape is an alist mapping a source symbol to a fetcher function. Each fetcher takes a =TERM= string and returns a per-source result plist:
+
+#+begin_src emacs-lisp
+;; Per-source result shape:
+;; (:source SYM :status STATUS [:defs (DEF ...)] [:reason STRING])
+;;
+;; STATUS values:
+;;   :ok :defs (def1 def2 ...)   — success, defs is a non-empty list
+;;   :no-defs                    — server reached, term not there
+;;   :unreachable                — DNS, refused, timeout
+;;   :server-error               — HTTP 5xx, malformed JSON, schema mismatch
+;;   :rate-limited               — HTTP 429
+;;
+;; A definition shape:
+;; (:source SYM :text "definition text...")
+#+end_src
+
+Register your fetcher:
+
+#+begin_src emacs-lisp
+(defun my-dictionaryapi-fetcher (term)
+  "Fetch TERM from DictionaryAPI.dev. Return per-source result plist."
+  ;; ... call the API, build the plist ...
+  )
+
+(add-to-list 'gloss-fetch--sources
+             '(dictionary-api . my-dictionaryapi-fetcher))
+(add-to-list 'gloss-fetch-sources 'dictionary-api t)
+#+end_src
+
+The orchestrator walks =gloss-fetch-sources= in order and aggregates each source's result into the user-facing rollup. See [[file:gloss-fetch.el][gloss-fetch.el]] for the Wiktionary fetcher as a worked example.
+
+* org-drill Integration
+:PROPERTIES:
+:CUSTOM_ID: org-drill
+:END:
+
+Once you have a few entries saved, =C-h g D= tags every top-level heading with =:drill:= and adds =:DRILL_CARD_TYPE: twosided= as a property. =M-x org-drill= then runs the spaced-repetition session against =gloss-file= unmodified.
+
+The export is idempotent — running it twice in a row touches nothing on the second pass. To remove the tags and properties, =M-x gloss-drill-untag-all= reverses every entry.
+
+=gloss-drill-export= signals a =user-error= if =org-drill= isn't installed. Install it with:
+
+#+begin_src elisp
+M-x package-install RET org-drill RET
+#+end_src
+
+Or via =:vc= for the maintained fork:
+
+#+begin_src emacs-lisp
+(use-package org-drill
+  :vc (:url "https://github.com/cjennings/org-drill" :rev :newest))
+#+end_src
+
+See [[file:docs/decisions/0003-drill-direction.org][ADR-3]] for why every export uses =twosided=.
+
+* Troubleshooting
+:PROPERTIES:
+:CUSTOM_ID: troubleshooting
+:END:
+
+** =Online fetch requires Emacs built with libxml2=
+
+The Wiktionary fetcher uses =libxml-parse-html-region= to strip HTML from the raw API response. If your Emacs build doesn't include libxml2, online fetching is disabled package-wide for the session.
+
+Manual =gloss-add= still works without libxml. To get online fetching, install an Emacs build with libxml support — most distribution packages include it.
+
+** =gloss: couldn't reach any source for TERM=
+
+Network failure. Either the host is unreachable (DNS, no connection, firewall), the request timed out (=gloss-fetch-timeout=), or the server returned an error (5xx, rate limited).
+
+For technical detail, enable =gloss-debug= and re-run the lookup. The =*gloss-debug*= buffer records the per-source =:reason= string (=timeout (5s)=, =HTTP 503=, etc.). =*Messages*= keeps the user-facing rollup only.
+
+** =gloss: glossary file appears corrupt=
+
+The org parser failed on =gloss-file=. The cache is preserved (so existing lookups still work), but recent changes haven't loaded. Open =gloss-file=, fix the syntax error, then =M-x gloss-reload=.
+
+The most common cause is a hand edit that broke an entry's =:PROPERTIES:= drawer. Find the offending heading, fix the drawer, save.
+
+** =Term not in glossary= for a term you saved earlier
+
+Cache and disk are out of sync. Try =M-x gloss-reload= first — that re-reads from disk. If it still misses, the term may have been hand-edited under a different heading; check =gloss-file= directly with =M-x gloss-edit=.
+
+The cache auto-refreshes on every lookup if =gloss-file='s mtime advances, so out-of-band edits via =git pull= or another Emacs session are picked up automatically. =gloss-reload= is the manual escape hatch.
+
+** Side window won't dismiss
+
+In a =*gloss: TERM*= buffer, =q= calls =quit-window= (inherited from =special-mode=). If your config rebinds =q=, the window won't dismiss the same way. Use =C-x 1= as a fallback, or rebind =q= back in =gloss-mode-map=.
+
+* Development
+:PROPERTIES:
+:CUSTOM_ID: development
+:END:
+
+** Test infrastructure
+
+=gloss= uses =Cask= for dependency management and =ert-runner= for tests. Install once:
+
+#+begin_src bash
+cask install
+#+end_src
+
+Common targets:
+
+#+begin_src bash
+make help                              # List all targets
+make test                              # Run the full suite
+make test-file FILE=tests/test-foo.el  # One file
+make test-name TEST=pattern            # By test name pattern
+make validate-parens                   # check-parens on every .el
+make compile                           # Byte-compile package files
+make lint                              # elisp-lint pass
+make clean                             # Remove .elc
+#+end_src
+
+The current suite is 129 tests across the four layers and the orchestration layer. The pure helpers (=gloss--orchestrate-fetch-result=, =gloss-display--format-candidate=, =gloss-display--render-entry=, =gloss--add-finish-internal=, =gloss--stats-text=) get full Normal/Boundary/Error coverage. Mode-glue gets smoke tests only — Emacs already tests its own prompts and major-mode mechanics.
+
+** Contributing
+
+Pull requests welcome. Match the existing test style: per-function file, three category coverage, real production code via =require= (never inlined). Mock at boundaries (=url-retrieve-synchronously=, =completing-read=, =display-buffer=); never mock internal helpers.
+
+For non-trivial changes, open an issue first to discuss the design.
 
 * License
 
